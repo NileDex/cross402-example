@@ -1,0 +1,122 @@
+.jar {
+  width: 100%;
+  max-width: 420px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 30px rgb(15 23 42 / 8%);
+}
+
+.jar h1 {
+  margin: 0 0 0.25rem;
+  font-size: 1.35rem;
+}
+
+.subtitle {
+  margin: 0 0 1.25rem;
+  color: #64748b;
+  font-size: 0.875rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-bottom: 0.85rem;
+  font-size: 0.8rem;
+  color: #334155;
+}
+
+.field input,
+.field select {
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  font-size: 0.95rem;
+}
+
+.wallet-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.wallet-row button,
+.actions button {
+  flex: 1;
+  min-width: 120px;
+  padding: 0.6rem 0.75rem;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  background: #0f172a;
+  color: #fff;
+}
+
+.wallet-row button.secondary {
+  background: #e2e8f0;
+  color: #0f172a;
+}
+
+.wallet-row button:disabled,
+.actions button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.actions button.primary {
+  background: #2563eb;
+}
+
+.meta {
+  margin: 0.75rem 0 0;
+  font-size: 0.75rem;
+  color: #475569;
+  word-break: break-all;
+}
+
+.log {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  white-space: pre-wrap;
+  min-height: 4rem;
+  color: #334155;
+}
+
+.badge {
+  display: inline-block;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+  background: #dcfce7;
+  color: #166534;
+  font-size: 0.7rem;
+  margin-bottom: 0.5rem;
+}
+
+.docs-link {
+  display: block;
+  margin-top: 1rem;
+  text-align: center;
+  font-size: 0.8rem;
+  color: #2563eb;
+  text-decoration: none;
+  padding: 0.5rem;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+}
+
+.docs-link:hover {
+  background: #dbeafe;
+}
