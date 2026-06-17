@@ -57,12 +57,22 @@ export async function buildSettleProof(
 
   const proofPayload = {
     x402Version: 2,
-    scheme,
-    network,
+    resource: {
+      url: '/api/intents',
+      description: 'X402 payment',
+      mimeType: 'application/json',
+    },
     accepted: {
+      scheme,
+      network,
       amount,
+      asset,
+      payTo,
+      maxTimeoutSeconds,
+      extra: extra ?? {},
     },
     payload: {
+      signature,
       authorization: {
         from,
         to: payTo,
@@ -71,7 +81,6 @@ export async function buildSettleProof(
         validBefore: String(validBefore),
         nonce,
       },
-      signature,
     },
   };
 

@@ -42,6 +42,25 @@ const ENV_SETUP = `
 cp .env.example .env
 `;
 
+const VITE_PROXY = `
+// vite.config.ts — add a proxy so local dev requests bypass CORS
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://api-pay.agent.tech',
+        changeOrigin: true,
+        secure: true,
+      },
+    },
+  },
+});
+`;
+
 const ENV_VARS = `
 # ── Browser-safe (VITE_ prefix — included in the bundle) ──────────────────────
 
@@ -178,19 +197,31 @@ export async function buildSettleProof(
   const signature = await signer.signTypedData(domain, TWA_TYPES, message);
 
   // Wrap everything into an X402 v2 proof and base64-encode it for the API.
+  // accepted must include the full payment requirements — not just amount.
   const proof = {
     x402Version: 2,
-    scheme,
-    network,
-    accepted: { amount },
+    resource: {
+      url: '/api/intents',
+      description: 'X402 payment',
+      mimeType: 'application/json',
+    },
+    accepted: {
+      scheme,
+      network,
+      amount,
+      asset,
+      payTo,
+      maxTimeoutSeconds,
+      extra: extra ?? {},
+    },
     payload: {
+      signature,
       authorization: {
         from, to: payTo, value: amount,
         validAfter:  String(validAfter),
         validBefore: String(validBefore),
         nonce,
       },
-      signature,
     },
   };
 
@@ -455,6 +486,14 @@ export default function Docs() {
           recipient field to be empty on load (useful if you're building a general-purpose payment form
           where different recipients can be entered each time).
         </div>
+
+        <h3>Local dev proxy (CORS)</h3>
+        <p>
+          Browsers block cross-origin requests from <code>localhost</code> unless the server sends the right CORS headers.
+          Add a Vite proxy so all <code>/api</code> calls are forwarded server-side during development.
+          This is only needed locally — on Vercel and other production hosts the browser hits the API directly.
+        </p>
+        <CodeBlock code={VITE_PROXY} file="vite.config.ts" />
 
         <div className="callout callout-warn">
           Never put <code>PAY_API_KEY</code> or <code>PAY_SECRET_KEY</code> into a <code>VITE_</code> variable.
