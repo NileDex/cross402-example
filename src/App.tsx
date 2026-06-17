@@ -150,6 +150,7 @@ export default function App() {
         <a href="https://docs.agent.tech/cross402/" target="_blank" rel="noreferrer">
           Cross402 docs
         </a>
+        <img src="/powered by.png" alt="Powered by Cross402" className="kyte-footer-powered" />
       </footer>
     </div>
   );

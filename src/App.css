@@ -686,3 +686,12 @@
 
 .kyte-footer a { color: rgba(255, 255, 255, 0.5); transition: color 0.18s; }
 .kyte-footer a:hover { color: rgba(255, 255, 255, 0.9); }
+
+.kyte-footer-powered {
+  height: 28px;
+  width: auto;
+  opacity: 0.75;
+  transition: opacity 0.18s;
+}
+
+.kyte-footer-powered:hover { opacity: 1; }
