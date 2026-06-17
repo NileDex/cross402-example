@@ -265,30 +265,57 @@ import { switchToChain } from './lib/wallet/chains';
 import { buildSettleProof } from './lib/wallet/signSettleProof';
 import { pollUntilSettled } from './lib/pollIntent';
 
-// Step 1 — Make sure MetaMask is on the right chain before signing.
+// Step 1 — Validate the recipient address before doing anything.
+// Never skip this — a malformed address will silently redirect funds.
+if (!/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
+  throw new Error('Invalid recipient address');
+}
+
+// Step 2 — Make sure MetaMask is on the right chain before signing.
 // If the user is on Ethereum but payerChain is 'base', this switches them over.
 await switchToChain(payerChain);
 
-// Step 2 — Get the signer (the connected MetaMask account).
+// Step 3 — Get the signer (the connected MetaMask account).
 const provider = new BrowserProvider(window.ethereum);
 await provider.send('eth_requestAccounts', []);
 const signer = await provider.getSigner();
 
-// Step 3 — Sign the payment authorization locally.
+// Step 4 — Sign the payment authorization locally.
 // The private key never leaves MetaMask — only the signature is sent.
 const settleProof = await buildSettleProof(signer, intent.paymentRequirements);
 
-// Step 4 — Submit the signed proof to Cross402.
+// Step 5 — Submit the signed proof to Cross402.
 // Cross402 verifies the signature, then submits the on-chain USDC transfer.
 await client.submitProof(intent.intentId, settleProof);
 
-// Step 5 — Poll until the payment reaches a terminal status.
+// Step 6 — Poll until the payment reaches a terminal status.
+// Use UI state (setStatus) rather than console.log — never log payment data in production.
 const result = await pollUntilSettled(client, intent.intentId, (status) => {
-  console.log('Status:', status); // PENDING → SOURCE_SETTLED → TARGET_SETTLED
+  setStatus(status); // update your UI
 });
 
 if (result.status === 'TARGET_SETTLED') {
-  console.log('Payment complete! Tx:', result.targetPayment?.txHash);
+  setTxHash(result.targetPayment?.txHash ?? '');
+}
+`;
+
+const VERCEL_HEADERS = `
+{
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options",  "value": "nosniff" },
+        { "key": "X-Frame-Options",          "value": "DENY" },
+        { "key": "Referrer-Policy",          "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy",       "value": "camera=(), microphone=(), geolocation=()" },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api-pay.agent.tech; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none';"
+        }
+      ]
+    }
+  ]
 }
 `;
 
@@ -389,6 +416,7 @@ export default function Docs() {
           <a href="#chains">Supported Chains</a>
           <a href="#statuses">Intent Statuses</a>
           <a href="#errors">Error Handling</a>
+          <a href="#security">Security</a>
         </nav>
       </div>
 
@@ -783,6 +811,60 @@ export default function Docs() {
           <br />— Amount: <strong>$0.02 minimum, $1,000,000 maximum</strong>, up to 6 decimal places
           <br />— Intent expiry: <strong>10 minutes</strong> from creation
           <br />— Rate limit: approximately <strong>60 requests / IP / minute</strong>
+        </div>
+      </section>
+
+      <hr className="divider" />
+
+      {/* Security */}
+      <section id="security">
+        <h2>Security</h2>
+        <p>
+          Payment flows handle real money. The checklist below covers the most common mistakes
+          that can result in lost funds or a compromised integration.
+        </p>
+
+        <h3>Validate the recipient address</h3>
+        <p>
+          Always verify the recipient address is a valid EVM address before calling <code>createIntent</code>.
+          A typo or injected value will redirect funds with no way to recover them.
+        </p>
+        <div className="callout callout-warn">
+          <strong>Never skip this check.</strong> The API accepts any string that looks like an address —
+          it will not catch addresses that are valid hex but belong to the wrong person.
+        </div>
+
+        <h3>Never log payment data in production</h3>
+        <p>
+          Avoid <code>console.log</code> for <code>paymentRequirements</code>, intent IDs, or signatures.
+          These values are visible to anyone with DevTools open and can be used to reconstruct payment flows.
+          Use UI state to display status to the user instead.
+        </p>
+
+        <h3>Keep server credentials off the client</h3>
+        <p>
+          <code>PAY_API_KEY</code> and <code>PAY_SECRET_KEY</code> must never appear in browser code.
+          Only use <code>PublicPayClient</code> on the frontend. <code>PayClient</code> and any file
+          that imports it belong exclusively in server-side or Node.js code — never in files that Vite can bundle.
+        </p>
+        <div className="callout callout-warn">
+          Any environment variable with the <code>VITE_</code> prefix is embedded in the JS bundle and
+          readable by anyone. Never prefix secret keys with <code>VITE_</code>.
+        </div>
+
+        <h3>Production security headers (Vercel)</h3>
+        <p>
+          Add these headers to <code>vercel.json</code> to prevent clickjacking, MIME sniffing,
+          and unauthorised script injection. The CSP restricts network connections to <code>api-pay.agent.tech</code> only.
+        </p>
+        <CodeBlock code={VERCEL_HEADERS} lang="json" file="vercel.json" />
+        <div className="callout callout-info">
+          <strong>What each header does:</strong><br />
+          — <code>X-Frame-Options: DENY</code> — blocks the app from being loaded in an iframe (clickjacking)<br />
+          — <code>X-Content-Type-Options: nosniff</code> — prevents MIME-type sniffing attacks<br />
+          — <code>Content-Security-Policy</code> — restricts scripts, styles, and network connections<br />
+          — <code>Referrer-Policy</code> — limits referrer info sent on navigation<br />
+          — <code>Permissions-Policy</code> — disables camera, microphone, and geolocation access
         </div>
       </section>
 

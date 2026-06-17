@@ -61,6 +61,10 @@ export default function App() {
       append('Set creator recipient address (your agent EVM wallet).');
       return;
     }
+    if (!/^0x[0-9a-fA-F]{40}$/.test(recipient.trim())) {
+      append('Invalid recipient address — must be a 0x… EVM address (42 hex characters).');
+      return;
+    }
 
     setBusy(true);
     setIntentId('');
@@ -79,7 +83,6 @@ export default function App() {
       setStatus(intent.status);
       append(`Intent ${intent.intentId} — ${intent.status}`);
       append(`paymentRequirements: ${JSON.stringify(intent.paymentRequirements, null, 0)}`);
-      console.log('paymentRequirements', intent.paymentRequirements);
 
       append('Switching wallet to payer chain...');
       await switchToPayerChain(payerChain);

@@ -1,3 +1,5 @@
+// SERVER-ONLY — never import this file in browser/frontend code.
+// PAY_API_KEY and PAY_SECRET_KEY must never reach the browser bundle.
 import { PayClient } from '@cross402/usdc';
 
 const baseUrl = process.env.PAY_BASE_URL ?? 'https://api-pay.agent.tech';
