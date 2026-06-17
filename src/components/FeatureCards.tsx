@@ -3,7 +3,7 @@ const FEATURES = [
     id: 'multichain',
     title: 'Any Chain',
     description:
-      'Send USDC from Base, Ethereum, Arbitrum, Polygon, BSC, or Solana — settle on the chain your recipient prefers.',
+      'Send USDC from Base, Ethereum, Arbitrum, Polygon, BSC, or Solana. Settle on the chain your recipient prefers.',
     chain: 'ethereum',
     visual: 'globe',
   },

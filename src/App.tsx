@@ -64,7 +64,7 @@ export default function App() {
       return;
     }
     if (!/^0x[0-9a-fA-F]{40}$/.test(recipient.trim())) {
-      append('Invalid recipient address — must be a 0x… EVM address (42 hex characters).');
+      append('Invalid recipient address: must be a 0x… EVM address (42 hex characters).');
       return;
     }
 
@@ -83,7 +83,7 @@ export default function App() {
 
       setIntentId(intent.intentId);
       setStatus(intent.status);
-      append(`Intent ${intent.intentId} — ${intent.status}`);
+      append(`Intent ${intent.intentId}: ${intent.status}`);
       append(`paymentRequirements: ${JSON.stringify(intent.paymentRequirements, null, 0)}`);
 
       append('Switching wallet to payer chain...');

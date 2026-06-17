@@ -687,6 +687,15 @@
 .kyte-footer a { color: rgba(255, 255, 255, 0.5); transition: color 0.18s; }
 .kyte-footer a:hover { color: rgba(255, 255, 255, 0.9); }
 
+@media (max-width: 600px) {
+  .kyte-header { padding: 0 1rem; }
+  .kyte-icon-btn { display: none; }
+  .kyte-main { padding: 2rem 1rem 5rem; gap: 3rem; }
+  .swap-section { max-width: 100%; }
+  .kyte-footer { gap: 1rem; flex-wrap: wrap; font-size: 0.75rem; }
+  .kyte-footer-powered { height: 22px; }
+}
+
 .kyte-footer-powered {
   height: 28px;
   width: auto;

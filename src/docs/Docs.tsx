@@ -323,7 +323,7 @@ export default function Docs() {
             <span className="docs-hero-eyebrow">Client-side · No API keys</span>
             <h1>Integration Guide</h1>
             <p>
-              Send USDC across blockchains from the browser — no backend required.
+              Send USDC across blockchains from the browser, no backend required.
               Copy the files below directly into your project.
             </p>
             <div className="docs-nav-pills">
@@ -337,7 +337,7 @@ export default function Docs() {
           <section id="overview">
             <h2>Overview</h2>
             <p>
-              Kyte uses <strong>Cross402</strong> — a payment layer that lets a user pay USDC on one
+              Kyte uses <strong>Cross402</strong>: a payment layer that lets a user pay USDC on one
               chain and a recipient receive it on a different chain, all in one flow.
             </p>
             <p>
@@ -370,17 +370,17 @@ export default function Docs() {
 
             <div className="callout callout-info">
               <strong>This guide covers the browser flow using <code>PublicPayClient</code>.</strong>{' '}
-              No API keys are needed — the user connects MetaMask and signs the payment themselves.
+              No API keys are needed. The user connects MetaMask and signs the payment themselves.
               Your API keys (<code>PAY_API_KEY</code> / <code>PAY_SECRET_KEY</code>) are only used
               if you add a server-side <code>PayClient</code> later.
             </div>
 
-            <h3>Browser flow — 4 steps</h3>
+            <h3>Browser flow: 4 steps</h3>
             <div className="callout callout-info" style={{ marginTop: 0 }}>
-              <strong>1. Create intent</strong> — tell Cross402 who to pay, how much, and on which chains. Nothing is charged yet.<br /><br />
-              <strong>2. Switch chain</strong> — MetaMask switches to the chain the user is paying from.<br /><br />
-              <strong>3. Sign</strong> — MetaMask shows a signing prompt. The user approves. No gas, no on-chain <code>approve()</code> needed.<br /><br />
-              <strong>4. Submit &amp; settle</strong> — your app sends the signature to Cross402, which settles USDC on the target chain.
+              <strong>1. Create intent:</strong> tell Cross402 who to pay, how much, and on which chains. Nothing is charged yet.<br /><br />
+              <strong>2. Switch chain:</strong> MetaMask switches to the chain the user is paying from.<br /><br />
+              <strong>3. Sign:</strong> MetaMask shows a signing prompt. The user approves. No gas, no on-chain <code>approve()</code> needed.<br /><br />
+              <strong>4. Submit &amp; settle:</strong> your app sends the signature to Cross402, which settles USDC on the target chain.
             </div>
 
             <div className="table-wrap">
@@ -411,13 +411,13 @@ export default function Docs() {
             <Step n={2} title="Set up your .env file">
               <p>
                 Copy <code>.env.example</code> to <code>.env</code> and fill in your values.
-                Variables prefixed with <code>VITE_</code> are bundled into the browser by Vite —
-                only put non-secret values there. Your API keys must <strong>never</strong> have the <code>VITE_</code> prefix.
+                Variables prefixed with <code>VITE_</code> are bundled into the browser by Vite.
+                Only put non-secret values there. Your API keys must <strong>never</strong> have the <code>VITE_</code> prefix.
               </p>
               <CodeBlock code={ENV} lang="bash" file=".env" />
               <div className="callout callout-warn">
                 <code>PAY_API_KEY</code> and <code>PAY_SECRET_KEY</code> are for server-side <code>PayClient</code> only.
-                The browser never reads them — Vite only injects <code>VITE_*</code> variables into the bundle.
+                The browser never reads them. Vite only injects <code>VITE_*</code> variables into the bundle.
                 Never add API keys with a <code>VITE_</code> prefix or they'll be visible to anyone in DevTools.
               </div>
             </Step>
@@ -429,13 +429,13 @@ export default function Docs() {
           <section id="flow">
             <h2>Payment Flow</h2>
             <p>
-              Create these five files in your project. Each one is a single responsibility —
-              copy them as-is, then wire them together using the example at the end.
+              Create these five files in your project. Each one is a single responsibility.
+              Copy them as-is, then wire them together using the example at the end.
             </p>
 
             <Step n={1} title="Create the browser client">
               <p>
-                This sets up <code>PublicPayClient</code> — the only client you need for the browser.
+                This sets up <code>PublicPayClient</code>, the only client you need for the browser.
                 No credentials required. Import <code>publicClient</code> from here everywhere in your frontend.
               </p>
               <CodeBlock code={PUBLIC_CLIENT} file="src/lib/publicClient.ts" />
@@ -461,7 +461,7 @@ export default function Docs() {
             <Step n={4} title="Build the EIP-3009 settle proof">
               <p>
                 This is what triggers the MetaMask signing popup. It builds an{' '}
-                <strong>EIP-3009 TransferWithAuthorization</strong> — a gasless signature that
+                <strong>EIP-3009 TransferWithAuthorization</strong>: a gasless signature that
                 authorizes Cross402 to move a specific amount of USDC within a time window.
                 The private key never leaves the user's wallet.
               </p>
@@ -473,7 +473,7 @@ export default function Docs() {
               <p>
                 After submitting the proof, settlement takes a few seconds. This helper
                 checks the intent status every 3 seconds and returns when it reaches a
-                terminal state — either <code>TARGET_SETTLED</code> (success) or a failure.
+                terminal state: either <code>TARGET_SETTLED</code> (success) or a failure.
               </p>
               <CodeBlock code={POLL} file="src/lib/pollIntent.ts" />
             </Step>
@@ -481,7 +481,7 @@ export default function Docs() {
             <Step n={6} title="Wire it all together">
               <p>
                 Import the five helpers above and call them in sequence. This is the complete
-                payment function — drop it into your component and call it on button click.
+                payment function. Drop it into your component and call it on button click.
               </p>
               <CodeBlock code={WIRE_UP} file="src/sendUSDC.ts" />
               <div className="callout callout-warn">
@@ -498,7 +498,7 @@ export default function Docs() {
             <h2>Supported Chains</h2>
             <p>
               The user pays from the <strong>payer chain</strong> and the recipient receives on
-              the <strong>target chain</strong>. These can be different — that's the point.
+              the <strong>target chain</strong>. These can be different, that's the point.
               The live list is fetched via <code>publicClient.listSupportedChains()</code>.
             </p>
             <div className="table-wrap">
@@ -519,11 +519,11 @@ export default function Docs() {
                     ['Arbitrum',   'arbitrum',   '0xa4b1',  true,  true],
                     ['Polygon',    'polygon',    '0x89',    true,  true],
                     ['BSC',        'bsc',        '0x38',    true,  true],
-                    ['Solana',     'solana',     '—',       true,  true],
-                    ['HyperEVM',   'hyperevm',   '—',       true,  true],
-                    ['Monad',      'monad',      '—',       true,  true],
-                    ['SKALE Base', 'skale-base', '—',       true,  false],
-                    ['MegaETH',    'megaeth',    '—',       true,  false],
+                    ['Solana',     'solana',     'N/A',     true,  true],
+                    ['HyperEVM',   'hyperevm',   'N/A',     true,  true],
+                    ['Monad',      'monad',      'N/A',     true,  true],
+                    ['SKALE Base', 'skale-base', 'N/A',     true,  false],
+                    ['MegaETH',    'megaeth',    'N/A',     true,  false],
                   ].map(([name, id, hex, payer, target]) => (
                     <tr key={id as string}>
                       <td>{name as string}</td>
@@ -537,7 +537,7 @@ export default function Docs() {
               </table>
             </div>
             <div className="callout callout-info">
-              SKALE Base and MegaETH are payer-only — users can pay <em>from</em> them
+              SKALE Base and MegaETH are payer-only. Users can pay <em>from</em> them
               but cannot receive <em>on</em> them. If you omit <code>targetChain</code> it defaults to <code>'base'</code>.
             </div>
           </section>
@@ -562,10 +562,10 @@ export default function Docs() {
                     ['PENDING',             'Proof submitted. Cross402 is verifying the source payment.',           false, 'gray'],
                     ['SOURCE_SETTLED',      'Source confirmed. Cross402 is bridging to the target chain.',          false, 'gray'],
                     ['TARGET_SETTLING',     'Bridge complete. Submitting the settlement on the target chain.',      false, 'gray'],
-                    ['TARGET_SETTLED',      '✓ Done. USDC arrived in the recipient\'s wallet.',                    true,  'green'],
-                    ['VERIFICATION_FAILED', '✗ Source payment failed — user likely had insufficient USDC.',        true,  'red'],
-                    ['PARTIAL_SETTLEMENT',  '✗ Source settled but target transfer failed. Contact support.',       true,  'red'],
-                    ['EXPIRED',             '✗ Not executed within 10 minutes. Create a new intent and retry.',    true,  'red'],
+                    ['TARGET_SETTLED',      'USDC arrived in the recipient\'s wallet.',                         true,  'green'],
+                    ['VERIFICATION_FAILED', 'Source payment failed. User likely had insufficient USDC.',        true,  'red'],
+                    ['PARTIAL_SETTLEMENT',  'Source settled but target transfer failed. Contact support.',      true,  'red'],
+                    ['EXPIRED',             'Not executed within 10 minutes. Create a new intent and retry.',   true,  'red'],
                   ].map(([status, desc, terminal, color]) => (
                     <tr key={status as string}>
                       <td><code>{status as string}</code></td>
