@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import './App.css';
+import { Header } from './components/Header';
+import { TransferPanel } from './components/TransferPanel';
 import { switchToPayerChain } from './lib/wallet/chains.js';
 import { pollUntilTerminal } from './lib/pollIntent.js';
 import { IntentStatus, publicClient } from './lib/publicClient.js';
@@ -115,110 +117,40 @@ export default function App() {
   };
 
   return (
-    <div className="jar">
-      <span className="badge">PublicPayClient · injected wallet</span>
-      <h1>OmniTip Jar</h1>
-      <p className="subtitle">
-        Cross402 browser flow — no API secrets in this app. Docs:{' '}
-        <a
-          href="https://docs.agent.tech/cross402/sdks/js-ts/"
-          target="_blank"
-          rel="noreferrer"
-        >
-          JS/TS SDK
+    <div className="kyte-app">
+      <div className="kyte-glow" aria-hidden />
+
+      <Header walletAddress={walletAddress} busy={busy} onConnect={onConnect} />
+
+      <main className="kyte-main">
+        <TransferPanel
+          amount={amount}
+          setAmount={setAmount}
+          payerChain={payerChain}
+          setPayerChain={setPayerChain}
+          targetChain={targetChain}
+          setTargetChain={setTargetChain}
+          recipient={recipient}
+          setRecipient={setRecipient}
+          payerChains={payerChains}
+          targetChains={targetChains}
+          walletAddress={walletAddress}
+          intentId={intentId}
+          status={status}
+          log={log}
+          busy={busy}
+          onConnect={onConnect}
+          onTransfer={onSendTip}
+        />
+      </main>
+
+      <footer className="kyte-footer">
+        <span>© Kyte</span>
+        <a href="/docs">Integration guide</a>
+        <a href="https://docs.agent.tech/cross402/" target="_blank" rel="noreferrer">
+          Cross402 docs
         </a>
-      </p>
-
-      <label className="field">
-        Creator wallet (recipient)
-        <input
-          value={recipient}
-          onChange={(e) => setRecipient(e.target.value)}
-          placeholder="0x… agent EVM address"
-          disabled={busy}
-        />
-      </label>
-
-      <label className="field">
-        Amount (USD)
-        <input
-          type="text"
-          inputMode="decimal"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          disabled={busy}
-        />
-      </label>
-
-      <label className="field">
-        Pay from (payer chain)
-        <select
-          value={payerChain}
-          onChange={(e) => setPayerChain(e.target.value)}
-          disabled={busy}
-        >
-          {(payerChains.length ? payerChains : [payerChain]).map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <label className="field">
-        Settle to (target chain)
-        <select
-          value={targetChain}
-          onChange={(e) => setTargetChain(e.target.value)}
-          disabled={busy}
-        >
-          {targetChains.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
-      </label>
-
-      <div className="wallet-row">
-        <button type="button" className="secondary" disabled={busy} onClick={onConnect}>
-          {walletAddress ? 'Reconnect wallet' : 'Connect wallet'}
-        </button>
-      </div>
-
-      <div className="actions">
-        <button
-          type="button"
-          className="primary"
-          disabled={busy}
-          onClick={onSendTip}
-        >
-          {busy ? 'Processing…' : 'Send tip'}
-        </button>
-      </div>
-
-      {walletAddress && (
-        <p className="meta">
-          Wallet: <code>{walletAddress}</code>
-        </p>
-      )}
-      {intentId && (
-        <p className="meta">
-          Intent: <code>{intentId}</code>
-          {status ? (
-            <>
-              {' '}
-              · <code>{status}</code>
-            </>
-          ) : null}
-        </p>
-      )}
-
-      <pre className="log">{log}</pre>
-
-      <a href="/docs" className="docs-link">
-        Integration Docs →
-      </a>
+      </footer>
     </div>
   );
 }

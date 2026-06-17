@@ -12,10 +12,16 @@ function CodeBlock({ code, lang = 'ts', file }: { code: string; lang?: string; f
     <div className="code-block">
       {file && <div className="file-path">{file}</div>}
       <span className="lang-tag" style={file ? { top: '2.6rem' } : undefined}>{lang}</span>
-      <button className={`copy-btn${copied ? ' copied' : ''}`} style={file ? { top: '2.4rem' } : undefined} onClick={copy}>
+      <button
+        className={`copy-btn${copied ? ' copied' : ''}`}
+        style={file ? { top: '2.4rem' } : undefined}
+        onClick={copy}
+      >
         {copied ? 'Copied!' : 'Copy'}
       </button>
-      <pre style={file ? { paddingTop: '0.75rem' } : undefined}><code>{code.trim()}</code></pre>
+      <pre style={file ? { paddingTop: '0.75rem' } : undefined}>
+        <code>{code.trim()}</code>
+      </pre>
     </div>
   );
 }
@@ -32,122 +38,86 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
   );
 }
 
-// ─── Code Snippets ────────────────────────────────────────────────────────────
+// ─── Code Snippets (exact project file contents) ──────────────────────────────
 
-const INSTALL_BROWSER = `npm install @cross402/usdc ethers`;
-const INSTALL_SERVER = `npm install @cross402/usdc`;
+const INSTALL = `npm install @cross402/usdc ethers`;
 
-const ENV_SETUP = `
-# Copy the example file and fill in your values
-cp .env.example .env
-`;
-
-const VITE_PROXY = `
-// vite.config.ts — add a proxy so local dev requests bypass CORS
-import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
-
-export default defineConfig({
-  plugins: [react()],
-  server: {
-    proxy: {
-      '/api': {
-        target: 'https://api-pay.agent.tech',
-        changeOrigin: true,
-        secure: true,
-      },
-    },
-  },
-});
-`;
-
-const ENV_VARS = `
-# ── Browser-safe (VITE_ prefix — included in the bundle) ──────────────────────
-
-# The Cross402 API URL. Leave this as-is unless you're using a staging environment.
+const ENV = `# ── Browser (Vite bundles anything with VITE_ prefix) ──────────
 VITE_PAY_BASE_URL=https://api-pay.agent.tech
+VITE_CREATOR_RECIPIENT=0xYourEVMWalletAddress
 
-# Optional: your EVM wallet address, pre-filled in the tip form so tippers
-# don't have to paste it in manually. Leave blank if you want tippers to enter
-# the recipient address themselves.
-VITE_CREATOR_RECIPIENT=0xYourAgentEVMWalletAddress
-
-
-# ── Server-side only (no VITE_ prefix — NEVER expose these to the browser) ─────
-
-# These are only needed if you're using PayClient in a Node.js backend or script.
-# Get your keys at https://agent.tech/dashboard → create an agent → copy keys.
+# ── Server-side only — NEVER put these in a VITE_ variable ──────
+# Used by PayClient in Node.js/backend code only.
+# Get keys at https://agent.tech/dashboard
 PAY_BASE_URL=https://api-pay.agent.tech
 PAY_API_KEY=ap_key_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-PAY_SECRET_KEY=ap_secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-`;
+PAY_SECRET_KEY=ap_secret_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`;
 
-const BROWSER_INIT = `
-import { PublicPayClient } from '@cross402/usdc/client';
+const PUBLIC_CLIENT = `import { IntentStatus, PublicPayClient } from '@cross402/usdc/client';
 
-// No API keys needed — completely safe to ship in your frontend bundle.
-// PublicPayClient only exposes endpoints that don't require authentication.
-const client = new PublicPayClient({
-  baseUrl: 'https://api-pay.agent.tech',
-});
+const baseUrl =
+  import.meta.env.VITE_PAY_BASE_URL ?? 'https://api-pay.agent.tech';
 
-export { client };
-`;
+// No API keys needed — safe to use directly in the browser.
+export const publicClient = new PublicPayClient({ baseUrl });
 
-const BROWSER_CREATE_INTENT = `
-import { client } from './lib/publicClient';
+export { IntentStatus, baseUrl };`;
 
-// Creates a new payment intent and returns signing instructions.
-// Think of this like opening a payment request — nothing is charged yet.
-const intent = await client.createIntent({
-  recipient: '0xRecipientWalletAddress',  // EVM address of who receives the funds
-  amount: '10.00',                         // USD amount as a string (min $0.02)
-  payerChain: 'base',                      // the chain the user pays FROM
-  targetChain: 'ethereum',                 // the chain the recipient receives ON
-});
+const WALLET = `import { BrowserProvider } from 'ethers';
 
-// You'll need both of these in the next steps:
-// intent.intentId            — unique ID to track this payment
-// intent.paymentRequirements — signing data MetaMask needs to authorize the transfer
-console.log(intent.intentId);
-`;
+export async function connectInjectedWallet() {
+  if (!window.ethereum) {
+    throw new Error(
+      'No injected wallet found. Install MetaMask or another browser wallet.',
+    );
+  }
 
-const CHAIN_SWITCH = `
-// Chain hex IDs required by MetaMask's wallet_switchEthereumChain method.
-// The user's wallet must be on the correct chain before they can sign.
-export const CHAIN_IDS: Record<string, string> = {
-  base:           '0x2105',
-  ethereum:       '0x1',
-  arbitrum:       '0xa4b1',
-  polygon:        '0x89',
-  bsc:            '0x38',
-  'base-sepolia': '0x14a34',
+  const provider = new BrowserProvider(window.ethereum);
+  await provider.send('eth_requestAccounts', []);
+  const signer = await provider.getSigner();
+  const address = await signer.getAddress();
+  const network = await provider.getNetwork();
+
+  return { provider, signer, address, chainId: Number(network.chainId) };
+}`;
+
+const CHAINS = `// EVM chain IDs for wallet_switchEthereumChain
+export const CHAIN_ID_BY_NAME: Record<string, string> = {
+  base:               '0x2105',
+  ethereum:           '0x1',
+  arbitrum:           '0xa4b1',
+  bsc:                '0x38',
+  polygon:            '0x89',
+  'base-sepolia':     '0x14a34',
+  'ethereum-sepolia': '0xaa36a7',
+  'arbitrum-sepolia': '0x66eee',
 };
 
-export async function switchToChain(payerChain: string) {
-  const hexId = CHAIN_IDS[payerChain];
-  if (!hexId || !window.ethereum) throw new Error(\`No chain mapping for "\${payerChain}"\`);
+export async function switchToPayerChain(payerChain: string): Promise<void> {
+  const hexId = CHAIN_ID_BY_NAME[payerChain];
+  if (!hexId || !window.ethereum) {
+    throw new Error(
+      \`No wallet chain mapping for "\${payerChain}". Add the network manually.\`,
+    );
+  }
 
   try {
     await window.ethereum.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: hexId }],
     });
-  } catch (err: any) {
-    // Error code 4902 = chain not added to the wallet yet
-    if (err.code === 4902) throw new Error(\`"\${payerChain}" not in your wallet. Add it manually.\`);
+  } catch (err) {
+    const code = (err as { code?: number }).code;
+    if (code === 4902) {
+      throw new Error(\`Chain "\${payerChain}" is not in your wallet. Add it first.\`);
+    }
     throw err;
   }
-}
-`;
+}`;
 
-const SIGN_PROOF = `
+const SIGN_PROOF = `import type { PaymentRequirements } from '@cross402/usdc/client';
 import { ethers, type Signer } from 'ethers';
-import type { PaymentRequirements } from '@cross402/usdc/client';
 
-// EIP-3009 defines a "TransferWithAuthorization" — a signed message that
-// authorizes a one-time USDC transfer without requiring an on-chain approve().
-// The user signs this off-chain in MetaMask; Cross402 submits it on-chain.
 const TWA_TYPES = {
   TransferWithAuthorization: [
     { name: 'from',        type: 'address' },
@@ -159,29 +129,31 @@ const TWA_TYPES = {
   ],
 };
 
+interface X402PaymentRequirements extends PaymentRequirements {
+  amount: string;
+  payTo: string;
+  asset: string;
+  maxTimeoutSeconds: number;
+  extra: { decimals: number; name: string; version: string };
+}
+
 export async function buildSettleProof(
   signer: Signer,
   paymentRequirements: PaymentRequirements,
 ): Promise<string> {
-  const req = paymentRequirements as any;
+  const req = paymentRequirements as X402PaymentRequirements;
   const { scheme, network, amount, payTo, asset, maxTimeoutSeconds, extra } = req;
 
-  // network is in "eip155:8453" format — extract the numeric chain ID
-  const chainId    = parseInt(network.split(':')[1], 10);
-  const from       = await signer.getAddress();
-  const nowSecs    = Math.floor(Date.now() / 1000);
-  const validAfter  = 0;                                    // valid immediately
-  const validBefore = nowSecs + (maxTimeoutSeconds ?? 600); // expires in ~10 min
-  const nonce       = ethers.hexlify(ethers.randomBytes(32)); // one-time random nonce
+  const chainId = parseInt(network.split(':')[1], 10);
+  if (isNaN(chainId)) throw new Error(\`Cannot parse chainId from: "\${network}"\`);
 
-  // The EIP-712 domain is the USDC contract on the payer chain.
-  // name and version come from paymentRequirements.extra (e.g. "USD Coin", "2").
-  const domain = {
-    name: extra.name,
-    version: extra.version,
-    chainId,
-    verifyingContract: asset,
-  };
+  const from        = await signer.getAddress();
+  const nowSecs     = Math.floor(Date.now() / 1000);
+  const validAfter  = 0;
+  const validBefore = nowSecs + (maxTimeoutSeconds ?? 600);
+  const nonce       = ethers.hexlify(ethers.randomBytes(32));
+
+  const domain = { name: extra.name, version: extra.version, chainId, verifyingContract: asset };
 
   const message = {
     from,
@@ -192,682 +164,461 @@ export async function buildSettleProof(
     nonce,
   };
 
-  // This line triggers the MetaMask signing popup.
-  // The user sees the amount, recipient, and expiry — then approves or rejects.
+  // Triggers the MetaMask signing popup — user approves or rejects here.
   const signature = await signer.signTypedData(domain, TWA_TYPES, message);
 
-  // Wrap everything into an X402 v2 proof and base64-encode it for the API.
-  // accepted must include the full payment requirements — not just amount.
   const proof = {
     x402Version: 2,
-    resource: {
-      url: '/api/intents',
-      description: 'X402 payment',
-      mimeType: 'application/json',
-    },
-    accepted: {
-      scheme,
-      network,
-      amount,
-      asset,
-      payTo,
-      maxTimeoutSeconds,
-      extra: extra ?? {},
-    },
+    resource: { url: '/api/intents', description: 'X402 payment', mimeType: 'application/json' },
+    accepted: { scheme, network, amount, asset, payTo, maxTimeoutSeconds, extra: extra ?? {} },
     payload: {
       signature,
       authorization: {
         from, to: payTo, value: amount,
-        validAfter:  String(validAfter),
-        validBefore: String(validBefore),
-        nonce,
+        validAfter: String(validAfter), validBefore: String(validBefore), nonce,
       },
     },
   };
 
   return btoa(JSON.stringify(proof));
-}
-`;
+}`;
 
-const POLL_HELPER = `
-import type { PublicPayClient } from '@cross402/usdc/client';
+const POLL = `import type { GetIntentResponse } from '@cross402/usdc/client';
+import { IntentStatus, publicClient } from './publicClient.js';
 
-// These are the statuses where the payment has reached a final outcome —
-// either successfully settled or failed. Stop polling when you hit one.
-const TERMINAL_FAIL = new Set(['EXPIRED', 'VERIFICATION_FAILED', 'PARTIAL_SETTLEMENT']);
+const TERMINAL_FAILURE = new Set<string>([
+  IntentStatus.Expired,
+  IntentStatus.VerificationFailed,
+  IntentStatus.PartialSettlement,
+]);
 
-export async function pollUntilSettled(
-  client: PublicPayClient,
+export async function pollUntilTerminal(
   intentId: string,
-  onStatus?: (status: string) => void, // optional callback to show live status to user
+  onStatus?: (status: string) => void,
   maxAttempts = 40,
-  intervalMs = 3000,
-) {
+  intervalMs  = 3000,
+): Promise<GetIntentResponse> {
   for (let i = 0; i < maxAttempts; i++) {
-    const intent = await client.getIntent(intentId);
+    const intent = await publicClient.getIntent(intentId);
     onStatus?.(intent.status);
 
-    if (intent.status === 'TARGET_SETTLED') return intent;   // success
-    if (TERMINAL_FAIL.has(intent.status)) {
-      throw new Error(\`Payment failed: \${intent.status}\`);
+    if (intent.status === IntentStatus.TargetSettled) return intent;
+    if (TERMINAL_FAILURE.has(intent.status)) {
+      throw new Error(\`Payment ended with status: \${intent.status}\`);
     }
 
-    await new Promise(r => setTimeout(r, intervalMs));
+    await new Promise((r) => setTimeout(r, intervalMs));
   }
-  throw new Error('Timed out waiting for settlement');
-}
-`;
+  throw new Error('Timed out waiting for payment settlement.');
+}`;
 
-const SUBMIT_AND_POLL = `
-import { BrowserProvider } from 'ethers';
-import { client } from './lib/publicClient';
-import { switchToChain } from './lib/wallet/chains';
-import { buildSettleProof } from './lib/wallet/signSettleProof';
-import { pollUntilSettled } from './lib/pollIntent';
+const WIRE_UP = `import { publicClient, IntentStatus } from './lib/publicClient';
+import { connectInjectedWallet }         from './lib/wallet/wallet';
+import { switchToPayerChain }            from './lib/wallet/chains';
+import { buildSettleProof }              from './lib/wallet/signSettleProof';
+import { pollUntilTerminal }             from './lib/pollIntent';
 
-// Step 1 — Validate the recipient address before doing anything.
-// Never skip this — a malformed address will silently redirect funds.
-if (!/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
-  throw new Error('Invalid recipient address');
-}
-
-// Step 2 — Make sure MetaMask is on the right chain before signing.
-// If the user is on Ethereum but payerChain is 'base', this switches them over.
-await switchToChain(payerChain);
-
-// Step 3 — Get the signer (the connected MetaMask account).
-const provider = new BrowserProvider(window.ethereum);
-await provider.send('eth_requestAccounts', []);
-const signer = await provider.getSigner();
-
-// Step 4 — Sign the payment authorization locally.
-// The private key never leaves MetaMask — only the signature is sent.
-const settleProof = await buildSettleProof(signer, intent.paymentRequirements);
-
-// Step 5 — Submit the signed proof to Cross402.
-// Cross402 verifies the signature, then submits the on-chain USDC transfer.
-await client.submitProof(intent.intentId, settleProof);
-
-// Step 6 — Poll until the payment reaches a terminal status.
-// Use UI state (setStatus) rather than console.log — never log payment data in production.
-const result = await pollUntilSettled(client, intent.intentId, (status) => {
-  setStatus(status); // update your UI
-});
-
-if (result.status === 'TARGET_SETTLED') {
-  setTxHash(result.targetPayment?.txHash ?? '');
-}
-`;
-
-const VERCEL_HEADERS = `
-{
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        { "key": "X-Content-Type-Options",  "value": "nosniff" },
-        { "key": "X-Frame-Options",          "value": "DENY" },
-        { "key": "Referrer-Policy",          "value": "strict-origin-when-cross-origin" },
-        { "key": "Permissions-Policy",       "value": "camera=(), microphone=(), geolocation=()" },
-        {
-          "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api-pay.agent.tech; img-src 'self' data:; font-src 'self'; object-src 'none'; frame-ancestors 'none';"
-        }
-      ]
-    }
-  ]
-}
-`;
-
-const SERVER_ENV = `
-# Get these from https://agent.tech/dashboard → create an agent → copy keys
-PAY_API_KEY=ap_key_xxxxx
-PAY_SECRET_KEY=ap_secret_xxxxx
-PAY_BASE_URL=https://api-pay.agent.tech
-`;
-
-const SERVER_INIT = `
-import { PayClient } from '@cross402/usdc';
-
-// PayClient requires API credentials and must only run on the server.
-// It can sign and execute payments automatically using your agent wallet —
-// no user or MetaMask involved.
-export const client = new PayClient({
-  baseUrl: process.env.PAY_BASE_URL ?? 'https://api-pay.agent.tech',
-  auth: {
-    apiKey:    process.env.PAY_API_KEY!,
-    secretKey: process.env.PAY_SECRET_KEY!,
-  },
-});
-`;
-
-const SERVER_CREATE = `
-import { client } from './cross402';
-
-// Use 'recipient' for a known wallet address, or 'email' to look up by email.
-const intent = await client.createIntent({
-  recipient: '0xRecipientAddress',   // or: email: 'user@example.com'
-  amount: '25.00',
-  payerChain: 'base',
-  targetChain: 'ethereum',           // omit to default to 'base'
-});
-
-console.log(intent.intentId);
-`;
-
-const SERVER_EXECUTE = `
-import { client } from './cross402';
-
-// executeIntent tells Cross402 to use your agent wallet to sign and
-// broadcast the payment on-chain automatically — no user input needed.
-await client.executeIntent(intent.intentId);
-
-// Poll until settled or failed
-for (let i = 0; i < 40; i++) {
-  const result = await client.getIntent(intent.intentId);
-  console.log('Status:', result.status);
-
-  if (result.status === 'TARGET_SETTLED') {
-    console.log('Settled! Tx:', result.targetPayment?.txHash);
-    break;
+async function sendUSDC(recipient: string, amount: string, payerChain: string, targetChain: string) {
+  // 1. Validate the recipient address before anything else.
+  if (!/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
+    throw new Error('Invalid EVM address.');
   }
-  if (['EXPIRED', 'VERIFICATION_FAILED', 'PARTIAL_SETTLEMENT'].includes(result.status)) {
-    throw new Error('Payment failed: ' + result.status);
-  }
-  await new Promise(r => setTimeout(r, 3000));
-}
-`;
 
-const ERROR_HANDLING = `
-import { PayApiError, PayValidationError } from '@cross402/usdc';
+  // 2. Create a payment intent — nothing is charged yet.
+  const intent = await publicClient.createIntent({
+    recipient,
+    amount,      // e.g. "10.00"
+    payerChain,  // e.g. "base"
+    targetChain, // e.g. "ethereum"
+  });
 
-try {
-  const intent = await client.createIntent({ ... });
-} catch (err) {
-  if (err instanceof PayValidationError) {
-    // Bad input — e.g. amount below $0.02, invalid address format, missing field
-    console.error('Validation error:', err.message);
-  } else if (err instanceof PayApiError) {
-    switch (err.statusCode) {
-      case 400: console.error('Bad request — check your parameters:', err.body); break;
-      case 401: console.error('Invalid API keys — check PAY_API_KEY and PAY_SECRET_KEY'); break;
-      case 429: console.error('Rate limited — slow down requests'); break;
-      default:  console.error(\`API error \${err.statusCode}:\`, err.body);
-    }
+  // 3. Switch MetaMask to the chain the user is paying from.
+  await switchToPayerChain(payerChain);
+
+  // 4. Connect wallet and get the signer.
+  const { signer } = await connectInjectedWallet();
+
+  // 5. Build the EIP-3009 proof — triggers MetaMask signing popup.
+  const proof = await buildSettleProof(signer, intent.paymentRequirements);
+
+  // 6. Submit the signed proof to Cross402.
+  await publicClient.submitProof(intent.intentId, proof);
+
+  // 7. Poll until the payment settles (or fails).
+  const result = await pollUntilTerminal(intent.intentId, (status) => {
+    console.log('Status:', status); // update your UI here
+  });
+
+  if (result.status === IntentStatus.TargetSettled) {
+    console.log('Done! Tx:', result.targetPayment?.txHash);
   }
-}
-`;
+}`;
+
+// ─── Nav ──────────────────────────────────────────────────────────────────────
+
+const NAV_SECTIONS = [
+  { href: '#overview', label: 'Overview' },
+  { href: '#setup',    label: 'Setup' },
+  { href: '#flow',     label: 'Payment Flow' },
+  { href: '#chains',   label: 'Supported Chains' },
+  { href: '#statuses', label: 'Intent Statuses' },
+  { href: '#errors',   label: 'Error Handling' },
+];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function Docs() {
   return (
-    <div className="docs">
+    <div className="docs-shell">
 
-      {/* Header */}
-      <div className="docs-header">
-        <h1>Cross402 Integration Guide</h1>
-        <p>Everything you need to send cross-chain USDC payments — from setup to settlement.</p>
-        <nav className="docs-nav">
-          <a href="#overview">Overview</a>
-          <a href="#setup">Setup</a>
-          <a href="#browser">Browser Flow</a>
-          <a href="#server">Server Flow</a>
-          <a href="#chains">Supported Chains</a>
-          <a href="#statuses">Intent Statuses</a>
-          <a href="#errors">Error Handling</a>
-          <a href="#security">Security</a>
-        </nav>
-      </div>
+      {/* ── Top bar ── */}
+      <header className="docs-topbar">
+        <a href="/" className="docs-logo">
+          <svg className="docs-logo-mark" viewBox="0 0 32 32" fill="none" aria-hidden>
+            <rect width="32" height="32" rx="8" fill="url(#dLogoGrad)" />
+            <path
+              d="M9 8v16M9 8l10 10M9 16l10 8"
+              stroke="white"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+            <defs>
+              <linearGradient id="dLogoGrad" x1="0" y1="0" x2="32" y2="32" gradientUnits="userSpaceOnUse">
+                <stop stopColor="#a855f7" />
+                <stop offset="1" stopColor="#6e54ff" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <span className="docs-logo-text">Kyte</span>
+          <span className="docs-logo-divider" aria-hidden />
+          <span className="docs-logo-label">Integration Guide</span>
+        </a>
+        <a href="/" className="docs-back-btn">
+          <svg viewBox="0 0 20 20" fill="none" width="14" height="14" aria-hidden>
+            <path d="M12 4l-6 6 6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          Back to app
+        </a>
+      </header>
 
-      {/* Overview */}
-      <section id="overview">
-        <h2>How it works</h2>
-        <p>
-          Cross402 is a payment layer that lets users send USDC on one blockchain while the recipient
-          receives it on a different blockchain — all in a single flow. For example, a user can pay
-          from Base and the creator receives on Ethereum, with no bridging steps required on either side.
-        </p>
-        <p>
-          There are two ways to use Cross402 depending on who signs the payment:
-        </p>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Flow</th>
-                <th>Who signs</th>
-                <th>Client</th>
-                <th>Use case</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td><strong>Browser flow</strong></td>
-                <td>The user, via MetaMask</td>
-                <td><code>PublicPayClient</code></td>
-                <td>Tip jars, checkout pages, any user-initiated payment</td>
-              </tr>
-              <tr>
-                <td><strong>Server flow</strong></td>
-                <td>Your agent wallet, automatically</td>
-                <td><code>PayClient</code></td>
-                <td>AI agents, automated billing, server-to-server transfers</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <p>
-          The browser flow is what this app uses. No API keys are needed — the user connects MetaMask,
-          signs a payment authorization, and Cross402 handles the rest. The server flow requires API
-          keys and must only run in a backend or Node script.
-        </p>
+      {/* ── Two-column layout ── */}
+      <div className="docs-layout">
 
-        <h3>Payment flow at a glance</h3>
-        <div className="callout callout-info">
-          <strong>1. Create intent</strong> — your app tells Cross402 who to pay, how much, and on which chains.<br /><br />
-          <strong>2. User signs</strong> — MetaMask shows the user a signing prompt. The user's private key never leaves their browser.<br /><br />
-          <strong>3. Submit proof</strong> — your app sends the signature to Cross402, which verifies and submits the on-chain transfer.<br /><br />
-          <strong>4. Poll for settlement</strong> — Cross402 bridges and settles USDC to the recipient on the target chain. You poll until <code>TARGET_SETTLED</code>.
-        </div>
-      </section>
+        {/* Sidebar */}
+        <aside className="docs-sidebar">
+          <span className="docs-sidebar-label">On this page</span>
+          <nav>
+            {NAV_SECTIONS.map((s) => (
+              <a key={s.href} href={s.href}>{s.label}</a>
+            ))}
+          </nav>
+        </aside>
 
-      <hr className="divider" />
+        {/* Main content */}
+        <main className="docs-content">
 
-      {/* Setup */}
-      <section id="setup">
-        <h2>Setup</h2>
-
-        <h3>Prerequisites</h3>
-        <p>Before you start, make sure you have:</p>
-        <ul style={{ paddingLeft: '1.25rem', color: '#334155', fontSize: '0.9rem', lineHeight: '2' }}>
-          <li><strong>Node.js 18+</strong> installed</li>
-          <li><strong>MetaMask</strong> (or any EIP-1193 browser wallet) installed in your browser</li>
-          <li><strong>USDC balance</strong> on the chain you want to pay from — the user must have enough USDC to cover the payment amount</li>
-          <li>An <strong>EVM wallet address</strong> to receive payments (your agent wallet)</li>
-          <li>API keys from <a href="https://agent.tech/dashboard" target="_blank" rel="noreferrer">agent.tech/dashboard</a> if you plan to use the server flow</li>
-        </ul>
-
-        <h3>Install</h3>
-        <p>
-          The browser flow needs <code>ethers</code> to communicate with MetaMask and sign EIP-712 typed data.
-          The server flow only needs the base package.
-        </p>
-        <p><strong>Browser / frontend:</strong></p>
-        <CodeBlock code={INSTALL_BROWSER} lang="bash" />
-        <p><strong>Server / Node only:</strong></p>
-        <CodeBlock code={INSTALL_SERVER} lang="bash" />
-
-        <h3>Environment variables</h3>
-        <p>
-          Copy <code>.env.example</code> to <code>.env</code> and fill in your values.
-          Variables with the <code>VITE_</code> prefix are bundled into the browser — only put
-          non-sensitive values there. API keys must never have the <code>VITE_</code> prefix.
-        </p>
-        <CodeBlock code={ENV_SETUP} lang="bash" />
-        <CodeBlock code={ENV_VARS} lang="bash" file=".env" />
-
-        <div className="callout callout-info">
-          <strong>VITE_CREATOR_RECIPIENT</strong> is optional but useful if you're building a tip jar or creator page.
-          Set it to your EVM wallet address and it will be pre-filled in the recipient field — so people
-          visiting your page don't have to paste in an address manually. Leave it blank if you want the
-          recipient field to be empty on load (useful if you're building a general-purpose payment form
-          where different recipients can be entered each time).
-        </div>
-
-        <h3>Local dev proxy (CORS)</h3>
-        <p>
-          Browsers block cross-origin requests from <code>localhost</code> unless the server sends the right CORS headers.
-          Add a Vite proxy so all <code>/api</code> calls are forwarded server-side during development.
-          This is only needed locally — on Vercel and other production hosts the browser hits the API directly.
-        </p>
-        <CodeBlock code={VITE_PROXY} file="vite.config.ts" />
-
-        <div className="callout callout-warn">
-          Never put <code>PAY_API_KEY</code> or <code>PAY_SECRET_KEY</code> into a <code>VITE_</code> variable.
-          Anything prefixed with <code>VITE_</code> is embedded in the JavaScript bundle and visible to anyone
-          who opens DevTools. Server-only keys belong in <code>.env</code> without the prefix and should only
-          be read by Node.js code.
-        </div>
-      </section>
-
-      <hr className="divider" />
-
-      {/* Browser Flow */}
-      <section id="browser">
-        <h2>Browser Flow — <code>PublicPayClient</code></h2>
-        <p>
-          Use this flow when the <strong>user pays from their own wallet</strong>. No API keys are required —
-          <code>PublicPayClient</code> is safe to use directly in the browser. The user connects MetaMask,
-          signs an authorization, and Cross402 settles USDC on their behalf.
-        </p>
-
-        <div className="callout callout-warn">
-          The user must have enough USDC on the <strong>payer chain</strong> before they sign.
-          If they don't, the payment will fail with <code>VERIFICATION_FAILED</code> after submission.
-          There is no way to catch this before submitting — instruct users to check their balance first.
-        </div>
-
-        <Step n={1} title="Initialize the client">
-          <p>
-            Create this file once. It sets up a browser-safe Cross402 client with no credentials.
-            Import <code>client</code> from here anywhere in your frontend — never create multiple instances.
-          </p>
-          <CodeBlock code={BROWSER_INIT} file="src/lib/publicClient.ts" />
-        </Step>
-
-        <Step n={2} title="Create a payment intent">
-          <p>
-            This is the first API call. It registers the payment with Cross402 and returns
-            an <code>intentId</code> (to track the payment) and <code>paymentRequirements</code> (the
-            signing data MetaMask needs). Nothing is charged yet — the intent just reserves a slot.
-          </p>
-          <p>
-            The intent expires <strong>10 minutes</strong> after creation. If the user takes longer than
-            that to sign, you'll need to create a new intent.
-          </p>
-          <CodeBlock code={BROWSER_CREATE_INTENT} file="src/lib/payment.ts" />
-          <div className="callout callout-warn">
-            The <code>recipient</code> address format must match the <code>targetChain</code>.
-            Use an EVM <code>0x…</code> address for Base, Ethereum, Arbitrum, Polygon, and BSC.
-            Use a Solana public key for <code>targetChain: 'solana'</code>.
+          {/* Hero */}
+          <div className="docs-hero">
+            <span className="docs-hero-eyebrow">Client-side · No API keys</span>
+            <h1>Integration Guide</h1>
+            <p>
+              Send USDC across blockchains from the browser — no backend required.
+              Copy the files below directly into your project.
+            </p>
+            <div className="docs-nav-pills">
+              {NAV_SECTIONS.map((s) => (
+                <a key={s.href} href={s.href}>{s.label}</a>
+              ))}
+            </div>
           </div>
-        </Step>
 
-        <Step n={3} title="Switch MetaMask to the payer chain">
-          <p>
-            Before signing, the user's wallet must be on the <strong>payer chain</strong> — the chain
-            they're sending USDC from. This helper sends a <code>wallet_switchEthereumChain</code> request
-            to MetaMask. The user will see a "Switch network" prompt if they're on the wrong chain.
-          </p>
-          <p>
-            Note: this only works for EVM chains. Non-EVM chains like Solana require the user to
-            switch manually in their wallet.
-          </p>
-          <CodeBlock code={CHAIN_SWITCH} file="src/lib/wallet/chains.ts" />
-        </Step>
+          {/* ── Overview ── */}
+          <section id="overview">
+            <h2>Overview</h2>
+            <p>
+              Kyte uses <strong>Cross402</strong> — a payment layer that lets a user pay USDC on one
+              chain and a recipient receive it on a different chain, all in one flow.
+            </p>
+            <p>
+              Cross402 ships <strong>two clients</strong>. Which one you use depends on who signs the payment:
+            </p>
 
-        <Step n={4} title="Build and sign the settle proof">
-          <p>
-            This is the core of the browser flow. The function reads signing parameters
-            from <code>paymentRequirements</code>, constructs an{' '}
-            <a href="https://eips.ethereum.org/EIPS/eip-3009" target="_blank" rel="noreferrer">EIP-3009</a>{' '}
-            <code>TransferWithAuthorization</code> typed message, and asks MetaMask to sign it.
-          </p>
-          <p>
-            EIP-3009 is a gasless signing standard supported by USDC on most EVM chains. Instead of
-            the user submitting an on-chain <code>approve()</code> transaction, they sign a message
-            off-chain that authorizes Cross402 to move a specific amount of USDC within a time window.
-            The private key never leaves the user's wallet — only the resulting signature is sent.
-          </p>
-          <p>
-            The function returns a base64-encoded proof string that you pass to <code>submitProof</code> in the next step.
-          </p>
-          <CodeBlock code={SIGN_PROOF} file="src/lib/wallet/signSettleProof.ts" />
-        </Step>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Client</th><th>Import</th><th>API keys?</th><th>Where to use</th><th>Who signs</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><strong>PublicPayClient</strong></td>
+                    <td><code>@cross402/usdc/client</code></td>
+                    <td><span className="badge badge-green">None</span></td>
+                    <td>Browser / frontend</td>
+                    <td>The user, via MetaMask</td>
+                  </tr>
+                  <tr>
+                    <td><strong>PayClient</strong></td>
+                    <td><code>@cross402/usdc</code></td>
+                    <td><span className="badge badge-red">Required</span></td>
+                    <td>Node.js / server only</td>
+                    <td>Your agent wallet, automatically</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
 
-        <Step n={5} title="Set up a poll helper">
-          <p>
-            After submitting the proof, settlement takes a few seconds. This helper polls
-            <code> getIntent()</code> every 3 seconds and resolves when the payment reaches a
-            terminal status — either success (<code>TARGET_SETTLED</code>) or a failure state.
-          </p>
-          <CodeBlock code={POLL_HELPER} file="src/lib/pollIntent.ts" />
-        </Step>
+            <div className="callout callout-info">
+              <strong>This guide covers the browser flow using <code>PublicPayClient</code>.</strong>{' '}
+              No API keys are needed — the user connects MetaMask and signs the payment themselves.
+              Your API keys (<code>PAY_API_KEY</code> / <code>PAY_SECRET_KEY</code>) are only used
+              if you add a server-side <code>PayClient</code> later.
+            </div>
 
-        <Step n={6} title="Submit the proof and wait for settlement">
-          <p>
-            Wire everything together: switch chain → get signer → sign → submit → poll.
-            This is the sequence that runs when the user clicks "Send tip" (or equivalent).
-          </p>
-          <CodeBlock code={SUBMIT_AND_POLL} file="src/App.tsx" />
-        </Step>
-      </section>
+            <h3>Browser flow — 4 steps</h3>
+            <div className="callout callout-info" style={{ marginTop: 0 }}>
+              <strong>1. Create intent</strong> — tell Cross402 who to pay, how much, and on which chains. Nothing is charged yet.<br /><br />
+              <strong>2. Switch chain</strong> — MetaMask switches to the chain the user is paying from.<br /><br />
+              <strong>3. Sign</strong> — MetaMask shows a signing prompt. The user approves. No gas, no on-chain <code>approve()</code> needed.<br /><br />
+              <strong>4. Submit &amp; settle</strong> — your app sends the signature to Cross402, which settles USDC on the target chain.
+            </div>
 
-      <hr className="divider" />
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Requirement</th><th>Details</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>MetaMask (or any EIP-1193 wallet)</td><td>Installed in the user's browser</td></tr>
+                  <tr><td>USDC balance</td><td>User must have USDC on the payer chain</td></tr>
+                  <tr><td><code>@cross402/usdc</code> + <code>ethers</code></td><td>The only two npm packages needed</td></tr>
+                  <tr><td>Recipient EVM address</td><td>A valid <code>0x…</code> 42-character address</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-      {/* Server Flow */}
-      <section id="server">
-        <h2>Server Flow — <code>PayClient</code></h2>
-        <p>
-          Use this flow when <strong>your backend initiates and signs the payment automatically</strong> —
-          no user or MetaMask involved. Your agent wallet is registered with Cross402 and holds the
-          funds; Cross402 signs and broadcasts on-chain when you call <code>executeIntent</code>.
-        </p>
-        <p>
-          This is ideal for AI agents paying for services, automated billing, or any payment that
-          should happen in the background without user interaction.
-        </p>
+          <hr className="divider" />
 
-        <div className="callout callout-warn">
-          <strong>Never import <code>PayClient</code> in browser code.</strong> Your <code>apiKey</code> and{' '}
-          <code>secretKey</code> would be visible to anyone who opens DevTools. Use <code>PublicPayClient</code>{' '}
-          for the frontend. <code>PayClient</code> belongs only in Node.js scripts, Express routes,
-          or any other server-side runtime.
-        </div>
+          {/* ── Setup ── */}
+          <section id="setup">
+            <h2>Setup</h2>
 
-        <Step n={1} title="Get your API keys">
-          <p>
-            Go to <a href="https://agent.tech/dashboard" target="_blank" rel="noreferrer">agent.tech/dashboard</a>,
-            create an agent, and copy your API key and secret key. Add them to your <code>.env</code> file —
-            never commit this file to version control.
-          </p>
-          <CodeBlock code={SERVER_ENV} lang="bash" file=".env  (never commit this file)" />
-        </Step>
+            <Step n={1} title="Install dependencies">
+              <CodeBlock code={INSTALL} lang="bash" />
+            </Step>
 
-        <Step n={2} title="Initialize PayClient">
-          <p>
-            Create this file in your backend and import <code>client</code> from here everywhere on the server.
-            It reads credentials from environment variables so they're never hardcoded.
-          </p>
-          <CodeBlock code={SERVER_INIT} file="src/lib/cross402.ts  (server only)" />
-        </Step>
+            <Step n={2} title="Set up your .env file">
+              <p>
+                Copy <code>.env.example</code> to <code>.env</code> and fill in your values.
+                Variables prefixed with <code>VITE_</code> are bundled into the browser by Vite —
+                only put non-secret values there. Your API keys must <strong>never</strong> have the <code>VITE_</code> prefix.
+              </p>
+              <CodeBlock code={ENV} lang="bash" file=".env" />
+              <div className="callout callout-warn">
+                <code>PAY_API_KEY</code> and <code>PAY_SECRET_KEY</code> are for server-side <code>PayClient</code> only.
+                The browser never reads them — Vite only injects <code>VITE_*</code> variables into the bundle.
+                Never add API keys with a <code>VITE_</code> prefix or they'll be visible to anyone in DevTools.
+              </div>
+            </Step>
+          </section>
 
-        <Step n={3} title="Create an intent">
-          <p>
-            Same concept as the browser flow, but you can identify the recipient by <code>email</code> or
-            wallet address. Cross402 resolves the email to the associated wallet on the backend.
-          </p>
-          <CodeBlock code={SERVER_CREATE} file="src/server/payment.ts" />
-        </Step>
+          <hr className="divider" />
 
-        <Step n={4} title="Execute and poll">
-          <p>
-            <code>executeIntent</code> triggers Cross402 to sign and broadcast the on-chain payment
-            using your agent wallet. Then poll until <code>TARGET_SETTLED</code>.
-          </p>
-          <CodeBlock code={SERVER_EXECUTE} file="src/server/payment.ts" />
-        </Step>
-      </section>
+          {/* ── Payment Flow ── */}
+          <section id="flow">
+            <h2>Payment Flow</h2>
+            <p>
+              Create these five files in your project. Each one is a single responsibility —
+              copy them as-is, then wire them together using the example at the end.
+            </p>
 
-      <hr className="divider" />
+            <Step n={1} title="Create the browser client">
+              <p>
+                This sets up <code>PublicPayClient</code> — the only client you need for the browser.
+                No credentials required. Import <code>publicClient</code> from here everywhere in your frontend.
+              </p>
+              <CodeBlock code={PUBLIC_CLIENT} file="src/lib/publicClient.ts" />
+            </Step>
 
-      {/* Supported Chains */}
-      <section id="chains">
-        <h2>Supported Chains</h2>
-        <p>
-          The payer chain is where the user sends USDC from. The target chain is where the recipient
-          receives it. These can be different — that's the point of Cross402.
-        </p>
-        <p>
-          The list of available chains is fetched live from the API via <code>listSupportedChains()</code>,
-          so it updates automatically when Cross402 adds new chains.
-        </p>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Chain</th>
-                <th>ID string</th>
-                <th>Hex chainId</th>
-                <th>Token</th>
-                <th>Payer</th>
-                <th>Target</th>
-              </tr>
-            </thead>
-            <tbody>
-              {[
-                ['Base',       'base',       '0x2105',  'USDC',  true,  true],
-                ['Ethereum',   'ethereum',   '0x1',     'USDC',  true,  true],
-                ['Arbitrum',   'arbitrum',   '0xa4b1',  'USDC',  true,  true],
-                ['Polygon',    'polygon',    '0x89',    'USDC',  true,  true],
-                ['BSC',        'bsc',        '0x38',    'USDC',  true,  true],
-                ['Solana',     'solana',     '—',       'USDC',  true,  true],
-                ['HyperEVM',   'hyperevm',   '—',       'USDC',  true,  true],
-                ['Monad',      'monad',      '—',       'USDC',  true,  true],
-                ['SKALE Base', 'skale-base', '—',       'USDC.e',true,  false],
-                ['MegaETH',    'megaeth',    '—',       'USDm',  true,  false],
-              ].map(([name, id, hex, token, payer, target]) => (
-                <tr key={id as string}>
-                  <td>{name as string}</td>
-                  <td><code>{id as string}</code></td>
-                  <td><code>{hex as string}</code></td>
-                  <td>{token as string}</td>
-                  <td><span className={`badge ${payer ? 'badge-green' : 'badge-gray'}`}>{payer ? 'Yes' : 'No'}</span></td>
-                  <td><span className={`badge ${target ? 'badge-blue' : 'badge-gray'}`}>{target ? 'Yes' : 'No'}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="callout callout-info">
-          SKALE Base and MegaETH are payer-only — users can pay <em>from</em> these chains
-          but recipients cannot receive <em>on</em> them. Omit <code>targetChain</code> to default to <code>'base'</code>.
-        </div>
-      </section>
+            <Step n={2} title="Connect MetaMask">
+              <p>
+                Requests wallet access and returns a <code>signer</code> (for signing),
+                an <code>address</code> (the connected account), and the current <code>chainId</code>.
+              </p>
+              <CodeBlock code={WALLET} file="src/lib/wallet/wallet.ts" />
+            </Step>
 
-      <hr className="divider" />
+            <Step n={3} title="Switch to the payer chain">
+              <p>
+                Before signing, the user's wallet must be on the chain they're paying from.
+                This sends a <code>wallet_switchEthereumChain</code> request to MetaMask.
+                The user will see a "Switch network" prompt if they're on the wrong chain.
+              </p>
+              <CodeBlock code={CHAINS} file="src/lib/wallet/chains.ts" />
+            </Step>
 
-      {/* Statuses */}
-      <section id="statuses">
-        <h2>Intent Statuses</h2>
-        <p>
-          After submitting a proof, poll <code>getIntent(intentId)</code> every few seconds.
-          The intent moves through these states in order. Stop polling when you reach a terminal status.
-        </p>
-        <div className="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Status</th><th>What it means</th><th>Terminal?</th></tr>
-            </thead>
-            <tbody>
-              {[
-                ['AWAITING_PAYMENT',    'Intent created. Waiting for the user to sign and submit a proof.',                     false, 'yellow'],
-                ['PENDING',             'Proof submitted. Cross402 is verifying the payment on the source chain.',              false, 'yellow'],
-                ['SOURCE_SETTLED',      'Source chain payment confirmed. Cross402 is now bridging to the target chain.',        false, 'yellow'],
-                ['TARGET_SETTLING',     'Bridge complete. Settlement transaction is being submitted on the target chain.',      false, 'yellow'],
-                ['TARGET_SETTLED',      'Done. USDC has arrived in the recipient\'s wallet on the target chain.',              true,  'green'],
-                ['VERIFICATION_FAILED', 'The source payment could not be verified — usually insufficient USDC balance. No funds moved.', true, 'red'],
-                ['PARTIAL_SETTLEMENT',  'Source chain settled but the target transfer failed. Contact support for reconciliation.', true, 'red'],
-                ['EXPIRED',             'The intent was not executed within 10 minutes. Create a new intent and try again.',   true,  'red'],
-              ].map(([status, desc, terminal, color]) => (
-                <tr key={status as string}>
-                  <td><code>{status as string}</code></td>
-                  <td>{desc as string}</td>
-                  <td><span className={`badge badge-${terminal ? color : 'gray'}`}>{terminal ? 'Yes' : 'No'}</span></td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <div className="callout callout-info">
-          Poll every <strong>3 seconds</strong>. Terminal statuses to handle:
-          <br />— <code>TARGET_SETTLED</code> → payment succeeded
-          <br />— <code>VERIFICATION_FAILED</code> → user likely had insufficient USDC
-          <br />— <code>EXPIRED</code> → took too long; create a new intent
-          <br />— <code>PARTIAL_SETTLEMENT</code> → contact Cross402 support
-        </div>
-      </section>
+            <Step n={4} title="Build the EIP-3009 settle proof">
+              <p>
+                This is what triggers the MetaMask signing popup. It builds an{' '}
+                <strong>EIP-3009 TransferWithAuthorization</strong> — a gasless signature that
+                authorizes Cross402 to move a specific amount of USDC within a time window.
+                The private key never leaves the user's wallet.
+              </p>
+              <p>Returns a base64 string you pass directly to <code>submitProof</code>.</p>
+              <CodeBlock code={SIGN_PROOF} file="src/lib/wallet/signSettleProof.ts" />
+            </Step>
 
-      <hr className="divider" />
+            <Step n={5} title="Poll for settlement">
+              <p>
+                After submitting the proof, settlement takes a few seconds. This helper
+                checks the intent status every 3 seconds and returns when it reaches a
+                terminal state — either <code>TARGET_SETTLED</code> (success) or a failure.
+              </p>
+              <CodeBlock code={POLL} file="src/lib/pollIntent.ts" />
+            </Step>
 
-      {/* Errors */}
-      <section id="errors">
-        <h2>Error Handling</h2>
-        <p>
-          The SDK throws typed errors so you can handle different failure modes cleanly.
-          Wrap all client calls in a try/catch and check the error type.
-        </p>
-        <CodeBlock code={ERROR_HANDLING} file="anywhere you call client methods" />
-        <div className="table-wrap">
-          <table>
-            <thead><tr><th>Error class</th><th>When it's thrown</th><th>Common causes</th></tr></thead>
-            <tbody>
-              <tr>
-                <td><code>PayValidationError</code></td>
-                <td>Before the API is called — bad input detected by the SDK</td>
-                <td>Amount below $0.02, invalid wallet address format, missing required field</td>
-              </tr>
-              <tr>
-                <td><code>PayApiError</code></td>
-                <td>The API returned an HTTP error</td>
-                <td>400 = bad request, 401 = wrong API keys, 429 = rate limited</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div className="callout callout-warn">
-          <strong>Key limits to know:</strong>
-          <br />— Amount: <strong>$0.02 minimum, $1,000,000 maximum</strong>, up to 6 decimal places
-          <br />— Intent expiry: <strong>10 minutes</strong> from creation
-          <br />— Rate limit: approximately <strong>60 requests / IP / minute</strong>
-        </div>
-      </section>
+            <Step n={6} title="Wire it all together">
+              <p>
+                Import the five helpers above and call them in sequence. This is the complete
+                payment function — drop it into your component and call it on button click.
+              </p>
+              <CodeBlock code={WIRE_UP} file="src/sendUSDC.ts" />
+              <div className="callout callout-warn">
+                Always validate the recipient address with the regex above before calling
+                <code> createIntent</code>. A wrong address will send funds with no way to recover them.
+              </div>
+            </Step>
+          </section>
 
-      <hr className="divider" />
+          <hr className="divider" />
 
-      {/* Security */}
-      <section id="security">
-        <h2>Security</h2>
-        <p>
-          Payment flows handle real money. The checklist below covers the most common mistakes
-          that can result in lost funds or a compromised integration.
-        </p>
+          {/* ── Supported Chains ── */}
+          <section id="chains">
+            <h2>Supported Chains</h2>
+            <p>
+              The user pays from the <strong>payer chain</strong> and the recipient receives on
+              the <strong>target chain</strong>. These can be different — that's the point.
+              The live list is fetched via <code>publicClient.listSupportedChains()</code>.
+            </p>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Chain</th>
+                    <th>ID string</th>
+                    <th>Hex chainId</th>
+                    <th>Payer</th>
+                    <th>Target</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ['Base',       'base',       '0x2105',  true,  true],
+                    ['Ethereum',   'ethereum',   '0x1',     true,  true],
+                    ['Arbitrum',   'arbitrum',   '0xa4b1',  true,  true],
+                    ['Polygon',    'polygon',    '0x89',    true,  true],
+                    ['BSC',        'bsc',        '0x38',    true,  true],
+                    ['Solana',     'solana',     '—',       true,  true],
+                    ['HyperEVM',   'hyperevm',   '—',       true,  true],
+                    ['Monad',      'monad',      '—',       true,  true],
+                    ['SKALE Base', 'skale-base', '—',       true,  false],
+                    ['MegaETH',    'megaeth',    '—',       true,  false],
+                  ].map(([name, id, hex, payer, target]) => (
+                    <tr key={id as string}>
+                      <td>{name as string}</td>
+                      <td><code>{id as string}</code></td>
+                      <td><code>{hex as string}</code></td>
+                      <td><span className={`badge ${payer ? 'badge-green' : 'badge-gray'}`}>{payer ? 'Yes' : 'No'}</span></td>
+                      <td><span className={`badge ${target ? 'badge-blue' : 'badge-gray'}`}>{target ? 'Yes' : 'No'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="callout callout-info">
+              SKALE Base and MegaETH are payer-only — users can pay <em>from</em> them
+              but cannot receive <em>on</em> them. If you omit <code>targetChain</code> it defaults to <code>'base'</code>.
+            </div>
+          </section>
 
-        <h3>Validate the recipient address</h3>
-        <p>
-          Always verify the recipient address is a valid EVM address before calling <code>createIntent</code>.
-          A typo or injected value will redirect funds with no way to recover them.
-        </p>
-        <div className="callout callout-warn">
-          <strong>Never skip this check.</strong> The API accepts any string that looks like an address —
-          it will not catch addresses that are valid hex but belong to the wrong person.
-        </div>
+          <hr className="divider" />
 
-        <h3>Never log payment data in production</h3>
-        <p>
-          Avoid <code>console.log</code> for <code>paymentRequirements</code>, intent IDs, or signatures.
-          These values are visible to anyone with DevTools open and can be used to reconstruct payment flows.
-          Use UI state to display status to the user instead.
-        </p>
+          {/* ── Intent Statuses ── */}
+          <section id="statuses">
+            <h2>Intent Statuses</h2>
+            <p>
+              Poll <code>publicClient.getIntent(intentId)</code> every few seconds after submitting.
+              Stop when you hit a terminal status.
+            </p>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr><th>Status</th><th>Meaning</th><th>Terminal?</th></tr>
+                </thead>
+                <tbody>
+                  {[
+                    ['AWAITING_PAYMENT',    'Intent created. Waiting for the user to sign.',                       false, 'gray'],
+                    ['PENDING',             'Proof submitted. Cross402 is verifying the source payment.',           false, 'gray'],
+                    ['SOURCE_SETTLED',      'Source confirmed. Cross402 is bridging to the target chain.',          false, 'gray'],
+                    ['TARGET_SETTLING',     'Bridge complete. Submitting the settlement on the target chain.',      false, 'gray'],
+                    ['TARGET_SETTLED',      '✓ Done. USDC arrived in the recipient\'s wallet.',                    true,  'green'],
+                    ['VERIFICATION_FAILED', '✗ Source payment failed — user likely had insufficient USDC.',        true,  'red'],
+                    ['PARTIAL_SETTLEMENT',  '✗ Source settled but target transfer failed. Contact support.',       true,  'red'],
+                    ['EXPIRED',             '✗ Not executed within 10 minutes. Create a new intent and retry.',    true,  'red'],
+                  ].map(([status, desc, terminal, color]) => (
+                    <tr key={status as string}>
+                      <td><code>{status as string}</code></td>
+                      <td>{desc as string}</td>
+                      <td><span className={`badge badge-${terminal ? color : 'gray'}`}>{terminal ? 'Yes' : 'No'}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
 
-        <h3>Keep server credentials off the client</h3>
-        <p>
-          <code>PAY_API_KEY</code> and <code>PAY_SECRET_KEY</code> must never appear in browser code.
-          Only use <code>PublicPayClient</code> on the frontend. <code>PayClient</code> and any file
-          that imports it belong exclusively in server-side or Node.js code — never in files that Vite can bundle.
-        </p>
-        <div className="callout callout-warn">
-          Any environment variable with the <code>VITE_</code> prefix is embedded in the JS bundle and
-          readable by anyone. Never prefix secret keys with <code>VITE_</code>.
-        </div>
+          <hr className="divider" />
 
-        <h3>Production security headers (Vercel)</h3>
-        <p>
-          Add these headers to <code>vercel.json</code> to prevent clickjacking, MIME sniffing,
-          and unauthorised script injection. The CSP restricts network connections to <code>api-pay.agent.tech</code> only.
-        </p>
-        <CodeBlock code={VERCEL_HEADERS} lang="json" file="vercel.json" />
-        <div className="callout callout-info">
-          <strong>What each header does:</strong><br />
-          — <code>X-Frame-Options: DENY</code> — blocks the app from being loaded in an iframe (clickjacking)<br />
-          — <code>X-Content-Type-Options: nosniff</code> — prevents MIME-type sniffing attacks<br />
-          — <code>Content-Security-Policy</code> — restricts scripts, styles, and network connections<br />
-          — <code>Referrer-Policy</code> — limits referrer info sent on navigation<br />
-          — <code>Permissions-Policy</code> — disables camera, microphone, and geolocation access
-        </div>
-      </section>
+          {/* ── Errors ── */}
+          <section id="errors">
+            <h2>Error Handling</h2>
+            <p>Wrap all client calls in a try/catch and check the error type.</p>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Error</th><th>When</th><th>Common cause</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td><code>PayValidationError</code></td>
+                    <td>Before the API is called</td>
+                    <td>Amount below $0.02, invalid address, missing field</td>
+                  </tr>
+                  <tr>
+                    <td><code>PayApiError</code></td>
+                    <td>API returned an HTTP error</td>
+                    <td>400 bad request · 401 wrong keys · 429 rate limited</td>
+                  </tr>
+                  <tr>
+                    <td>MetaMask rejection</td>
+                    <td>User clicks "Reject" in the wallet</td>
+                    <td>Catch and show a "Payment cancelled" message</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="callout callout-warn">
+              <strong>Limits:</strong> amount $0.02 – $1,000,000 · intent expires after <strong>10 minutes</strong> · ~60 requests / IP / minute
+            </div>
+          </section>
 
+        </main>
+      </div>{/* docs-layout */}
+
+      <footer className="docs-footer">
+        <span>© Kyte</span>
+        <a href="https://docs.agent.tech/cross402/" target="_blank" rel="noreferrer">Cross402 docs</a>
+        <a href="https://agent.tech/dashboard" target="_blank" rel="noreferrer">Dashboard</a>
+      </footer>
     </div>
   );
 }
