@@ -54,8 +54,12 @@ export default function App() {
       setWalletAddress(list[0] ?? '');
     };
 
-    window.ethereum.on('accountsChanged', handleAccountsChanged);
-    return () => { window.ethereum!.removeListener('accountsChanged', handleAccountsChanged); };
+    const eth = window.ethereum as typeof window.ethereum & {
+      on: (event: string, handler: (accounts: unknown) => void) => void;
+      removeListener: (event: string, handler: (accounts: unknown) => void) => void;
+    };
+    eth.on('accountsChanged', handleAccountsChanged);
+    return () => { eth.removeListener('accountsChanged', handleAccountsChanged); };
   }, [authenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
