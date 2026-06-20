@@ -130,6 +130,25 @@
 
 .kyte-terminal-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+.kyte-disconnect-btn {
+  padding: 0.45rem 1rem;
+  border-radius: 999px;
+  background: transparent;
+  border: 1.5px solid rgba(110, 84, 255, 0.4);
+  color: #6e54ff;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s, color 0.18s;
+  white-space: nowrap;
+}
+
+.kyte-disconnect-btn:hover {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: #dc2626;
+  color: #dc2626;
+}
+
 /* ─── Hero ───────────────────────────────────────────────────── */
 
 .hero {

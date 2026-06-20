@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
+import { usePrivy, useWallets, useLogout } from '@privy-io/react-auth';
+import { BrowserProvider } from 'ethers';
 import './App.css';
 import { Header } from './components/Header';
 import { TransferPanel } from './components/TransferPanel';
@@ -6,12 +8,20 @@ import { switchToPayerChain } from './lib/wallet/chains.js';
 import { pollUntilTerminal } from './lib/pollIntent.js';
 import { IntentStatus, publicClient } from './lib/publicClient.js';
 import { buildSettleProof } from './lib/wallet/signSettleProof.js';
-import { connectInjectedWallet } from './lib/wallet/wallet.js';
 
 const defaultRecipient =
   import.meta.env.VITE_CREATOR_RECIPIENT?.trim() ?? '';
 
 export default function App() {
+  const { ready, authenticated, login } = usePrivy();
+  const { wallets: privyWallets } = useWallets();
+
+  const [walletAddress, setWalletAddress] = useState('');
+
+  const { logout } = useLogout({
+    onSuccess: () => setWalletAddress(''),
+  });
+
   const [amount, setAmount] = useState('5.00');
   const [payerChain, setPayerChain] = useState('base');
   const [targetChain, setTargetChain] = useState('base');
@@ -19,16 +29,34 @@ export default function App() {
 
   const [payerChains, setPayerChains] = useState<string[]>([]);
   const [targetChains, setTargetChains] = useState<string[]>(['base', 'ethereum', 'arbitrum']);
-
-  const [walletAddress, setWalletAddress] = useState('');
   const [intentId, setIntentId] = useState('');
   const [status, setStatus] = useState('');
-  const [log, setLog] = useState('Ready. Connect an injected wallet (MetaMask).');
+  const [log, setLog] = useState('Ready. Connect your wallet to get started.');
   const [busy, setBusy] = useState(false);
 
   const append = useCallback((line: string) => {
     setLog((prev) => `${prev}${line}\n`);
   }, []);
+
+  useEffect(() => {
+    if (!authenticated || !window.ethereum) {
+      setWalletAddress('');
+      return;
+    }
+
+    // Always read the actual current MetaMask account, not Privy's cached session
+    (window.ethereum.request({ method: 'eth_accounts' }) as Promise<string[]>)
+      .then((accounts) => setWalletAddress(accounts[0] ?? ''))
+      .catch(() => setWalletAddress(privyWallets[0]?.address ?? ''));
+
+    const handleAccountsChanged = (accounts: unknown) => {
+      const list = accounts as string[];
+      setWalletAddress(list[0] ?? '');
+    };
+
+    window.ethereum.on('accountsChanged', handleAccountsChanged);
+    return () => { window.ethereum!.removeListener('accountsChanged', handleAccountsChanged); };
+  }, [authenticated]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     publicClient
@@ -45,16 +73,10 @@ export default function App() {
       });
   }, [append]);
 
-  const onConnect = async () => {
-    setBusy(true);
-    try {
-      const { address } = await connectInjectedWallet();
-      setWalletAddress(address);
-      append(`Wallet connected: ${address}`);
-    } catch (err) {
-      append(`Connect failed: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setBusy(false);
+  const onConnect = () => {
+    if (!ready) return;
+    if (!authenticated) {
+      login();
     }
   };
 
@@ -65,6 +87,23 @@ export default function App() {
     }
     if (!/^0x[0-9a-fA-F]{40}$/.test(recipient.trim())) {
       append('Invalid recipient address: must be a 0x… EVM address (42 hex characters).');
+      return;
+    }
+
+    const parsedAmount = parseFloat(amount);
+    if (!amount.trim() || isNaN(parsedAmount) || parsedAmount <= 0) {
+      append('Invalid amount: must be a positive number.');
+      return;
+    }
+
+    if (!authenticated || !walletAddress) {
+      append('No wallet connected. Please log in first.');
+      login();
+      return;
+    }
+
+    if (!window.ethereum) {
+      append('MetaMask not found. Please install it and try again.');
       return;
     }
 
@@ -87,10 +126,11 @@ export default function App() {
       append(`paymentRequirements: ${JSON.stringify(intent.paymentRequirements, null, 0)}`);
 
       append('Switching wallet to payer chain...');
-      await switchToPayerChain(payerChain);
+      await switchToPayerChain(payerChain, window.ethereum);
 
-      const { signer, address } = await connectInjectedWallet();
-      append(`Signing as ${address}...`);
+      const provider = new BrowserProvider(window.ethereum);
+      const signer = await provider.getSigner();
+      append(`Signing as ${walletAddress}...`);
 
       const settleProof = await buildSettleProof(signer, intent.paymentRequirements);
       append('Submitting settle proof...');
@@ -116,11 +156,19 @@ export default function App() {
     }
   };
 
+  if (!ready) {
+    return (
+      <div className="kyte-app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        Loading...
+      </div>
+    );
+  }
+
   return (
     <div className="kyte-app">
       <div className="kyte-glow" aria-hidden />
 
-      <Header walletAddress={walletAddress} busy={busy} onConnect={onConnect} />
+      <Header walletAddress={walletAddress} busy={busy} onConnect={onConnect} onDisconnect={logout} />
 
       <main className="kyte-main">
         <TransferPanel

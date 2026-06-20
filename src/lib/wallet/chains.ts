@@ -10,16 +10,17 @@ export const CHAIN_ID_BY_NAME: Record<string, string> = {
   'arbitrum-sepolia': '0x66eee',
 };
 
-export async function switchToPayerChain(payerChain: string): Promise<void> {
+export async function switchToPayerChain(payerChain: string, provider?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> }): Promise<void> {
   const hexId = CHAIN_ID_BY_NAME[payerChain];
-  if (!hexId || !window.ethereum) {
+  const eip1193 = provider ?? window.ethereum;
+  if (!hexId || !eip1193) {
     throw new Error(
       `No injected wallet chain mapping for "${payerChain}". Add the network in your wallet manually.`,
     );
   }
 
   try {
-    await window.ethereum.request({
+    await eip1193.request({
       method: 'wallet_switchEthereumChain',
       params: [{ chainId: hexId }],
     });
