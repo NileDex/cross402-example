@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { Analytics } from 'ribby-sdk/analytics-react';
 import { usePrivy, useWallets, useLogout } from '@privy-io/react-auth';
 import { BrowserProvider } from 'ethers';
 import './App.css';
@@ -162,14 +163,19 @@ export default function App() {
 
   if (!ready) {
     return (
-      <div className="kyte-app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        Loading...
-      </div>
+      <>
+        <Analytics />
+        <div className="kyte-app" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+          Loading...
+        </div>
+      </>
     );
   }
 
   return (
-    <div className="kyte-app">
+    <>
+      <Analytics />
+      <div className="kyte-app">
       <div className="kyte-glow" aria-hidden />
 
       <Header walletAddress={walletAddress} busy={busy} onConnect={onConnect} onDisconnect={logout} />
@@ -205,5 +211,6 @@ export default function App() {
         <img src="/powered by.png" alt="Powered by Cross402" className="kyte-footer-powered" />
       </footer>
     </div>
+    </>
   );
 }
